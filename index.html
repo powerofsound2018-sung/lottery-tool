@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>抽獎工具</title>
+<style>
+  :root {
+    --bg: #faf8f5;
+    --card: #ffffff;
+    --ink: #4F4842;
+    --muted: #9b938b;
+    --line: #ece7e0;
+    --accent: #c89a5b;
+    --accent-soft: #f3e9d8;
+    --good: #9CA89E;
+    --bad: #B09C95;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; letter-spacing: 0.02em; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+  .card h2 { font-size: 17px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
+  .card .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .step { display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft);
+    color: var(--accent); font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  textarea {
+    width: 100%; min-height: 130px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px;
+    color: var(--ink); background: #fdfcfa; line-height: 1.6;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  label.opt { font-size: 13px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+  input[type=number] { width: 90px; border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 8px; font-size: 14px; text-align: right; }
+  select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px;
+    font-size: 13px; font-family: inherit; background: #fdfcfa; color: var(--ink); }
+  button {
+    border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px;
+    font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity .15s;
+  }
+  button:hover { opacity: .88; }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-ghost { background: var(--accent-soft); color: var(--accent); }
+  .drop {
+    border: 1.5px dashed var(--line); border-radius: 10px; padding: 18px;
+    text-align: center; color: var(--muted); font-size: 13px; cursor: pointer;
+    background: #fdfcfa; margin-top: 12px; transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+  .warn { background: #fbf3ea; border: 1px solid #f0dcc0; color: #8a6d3b;
+    border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; background: var(--accent-soft); color: var(--accent);
+    border-radius: 20px; padding: 1px 9px; font-size: 12px; font-weight: 600; }
+  .tag-c { color: var(--good); font-weight: 600; }
+  .summary { display: flex; gap: 24px; flex-wrap: wrap; margin: 14px 0 4px; }
+  .summary div { font-size: 13px; color: var(--muted); }
+  .summary b { display: block; font-size: 22px; color: var(--ink); font-weight: 700; }
+  .winner-box { text-align: center; padding: 30px 20px; }
+  .winner-name { font-size: 34px; font-weight: 800; color: var(--accent);
+    letter-spacing: 0.04em; min-height: 44px; }
+  .winner-list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .winner-list .w { background: var(--accent-soft); border-radius: 10px;
+    padding: 10px 16px; font-size: 16px; font-weight: 700; color: var(--ink); }
+  .winner-list .w span { float: right; color: var(--accent); font-weight: 600; font-size: 13px; }
+  .prize-grid { display: flex; flex-direction: column; gap: 8px; }
+  .prize-row { display: flex; align-items: center; gap: 10px; }
+  .prize-tag { flex-shrink: 0; width: 96px; font-size: 13px; font-weight: 700; color: var(--accent); }
+  .prize-row input[type=text] { flex: 1; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; font-family: inherit; color: var(--ink); background: #fdfcfa; }
+  .prize-row input[type=text]:focus { outline: none; border-color: var(--accent); }
+  .round { margin-bottom: 14px; }
+  .round-h { font-size: 13px; color: var(--muted); font-weight: 700; margin: 6px 0 8px;
+    border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .muted-empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+  .fmt { background: #fdfcfa; border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; font-size: 12px; color: var(--muted); margin-top: 8px;
+    font-family: ui-monospace, monospace; white-space: pre-wrap; }
+  /* ===== 抽獎全螢幕動畫 ===== */
+  .overlay { position: fixed; inset: 0; z-index: 999; display: none;
+    background: radial-gradient(circle at 50% 38%, #3a332c 0%, #1c1813 68%, #0c0a07 100%);
+    align-items: center; justify-content: center; }
+  .overlay.show { display: flex; animation: fadeIn .35s ease; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  #confetti { position: absolute; inset: 0; pointer-events: none; }
+  .overlay-inner { position: relative; text-align: center; padding: 20px; max-width: 92vw; }
+  .ov-label { color: #d8c9a8; font-size: 16px; letter-spacing: 0.35em; margin-bottom: 22px; }
+  .ov-name { font-size: 62px; font-weight: 800; color: #f6e4bf; min-height: 74px;
+    letter-spacing: 0.05em; text-shadow: 0 0 34px rgba(200,154,91,.65);
+    animation: pulse .5s ease-in-out infinite alternate; }
+  @keyframes pulse { from { transform: scale(.97) } to { transform: scale(1.05) } }
+  .ov-winners { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; align-items: center; }
+  .ov-win { background: linear-gradient(135deg, #c89a5b, #ecd09a); color: #2a241d;
+    border-radius: 16px; padding: 14px 40px; box-shadow: 0 10px 50px rgba(200,154,91,.5);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    animation: popIn .45s cubic-bezier(.2,1.5,.4,1); }
+  .ov-win b { font-size: 30px; font-weight: 800; }
+  .ov-win span { font-size: 14px; font-weight: 600; opacity: .65; }
+  .ov-prize { font-size: 13px; font-weight: 800; letter-spacing: .12em; color: #6b4f1d;
+    background: rgba(255,255,255,.42); padding: 2px 14px; border-radius: 20px; }
+  .ov-win.grand { transform: scale(1.1); box-shadow: 0 14px 72px rgba(200,154,91,.78); }
+  .ov-win.grand b { font-size: 42px; }
+  .ov-win.grand .ov-prize { background: #2a241d; color: #f6e4bf; font-size: 14px; }
+  @keyframes popIn { from { transform: scale(0); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+  .ov-close { margin-top: 34px; background: rgba(255,255,255,.12); color: #f6e4bf;
+    border: 1px solid rgba(246,228,191,.3); border-radius: 10px; padding: 10px 30px;
+    font-size: 15px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>抽獎工具</h1>
+  <p class="sub">每滿 2000 元一次機會，有留言的人多一次。資料只留在這個瀏覽器，不會上傳。</p>
+
+  <!-- Step 1: 訂單 -->
+  <div class="card">
+    <h2><span class="step">1</span> 貼上訂單</h2>
+    <p class="hint">一行一筆，要有「人名」和「金額」。從試算表整欄複製貼上也可以。</p>
+    <textarea id="orders" placeholder="王小明 3500&#10;陳美麗 6000&#10;林大同	1999&#10;張三,4200"></textarea>
+    <div class="row">
+      <label class="opt">每 <input type="number" id="per" value="2000" min="1" step="100"> 元 = 1 次機會</label>
+      <label class="opt"><input type="checkbox" id="mergeOrders" checked> 同名訂單金額累加</label>
+    </div>
+
+    <div class="drop" id="xlsxDrop" style="margin-top:14px;">
+      匯入 <b>Excel / CSV 訂單檔</b>：拖進來，或點這裡選檔（.xlsx / .xls / .csv）
+      <input type="file" id="xlsxFile" accept=".xlsx,.xls,.csv" hidden>
+    </div>
+    <div id="xlsxStatus" class="hint" style="margin-top:8px;"></div>
+    <div id="xlsxMap" style="display:none; margin-top:10px;">
+      <div class="row">
+        <label class="opt"><input type="checkbox" id="hasHeader" checked> 第一列是標題</label>
+        <label class="opt">姓名欄 <select id="colName"></select></label>
+        <label class="opt">金額欄 <select id="colAmount"></select></label>
+        <button class="btn-primary" onclick="applyXlsx()">帶入訂單 ↓</button>
+      </div>
+      <div class="fmt" id="xlsxPreview"></div>
+    </div>
+
+    <details>
+      <summary>支援哪些格式？</summary>
+      <div class="fmt">王小明 3500
+陳美麗,6000
+林大同	1999
+張三 - $4,200
+每行只要有名字 + 數字就抓得到。金額的逗號、$、元 會自動忽略。</div>
+    </details>
+  </div>
+
+  <!-- Step 2: 留言 -->
+  <div class="card">
+    <h2><span class="step">2</span> 留言名單（多一次機會）</h2>
+
+    <p class="hint" style="font-weight:600;color:var(--ink);margin-bottom:4px;">方法 A：貼上複製的留言原文，自動清出人名</p>
+    <p class="hint">在 FB / IG 留言區整段複製就好（含時間、「回覆」都沒關係），貼到這裡按「清出人名」。</p>
+    <textarea id="rawComments" placeholder="林毓晟&#10;給爺爺奶奶，聽訊息用：）&#10;38分鐘&#10;回覆&#10;&#10;作者&#10;陳盟升&#10;林毓晟 也是不錯&#10;28分鐘&#10;回覆"></textarea>
+    <div class="row">
+      <button class="btn-ghost" onclick="cleanRaw()">清出人名 ↓</button>
+      <label class="opt"><input type="checkbox" id="excludeAuthor" checked> 排除作者 / 小編</label>
+      <span class="hint" id="cleanStatus" style="margin:0;"></span>
+    </div>
+
+    <p class="hint" style="font-weight:600;color:var(--ink);margin:18px 0 4px;">方法 B：清好的人名（抽獎用這欄）</p>
+    <p class="hint">一行一個或逗號分隔。上面清出來的名字會放進這裡，可手動增刪。</p>
+    <textarea id="comments" placeholder="王小明&#10;陳美麗&#10;路人甲"></textarea>
+
+    <div class="drop" id="drop">
+      把<b>留言截圖</b>拖進來辨識人名（輔助用，請務必人工核對）<br>
+      或點這裡選圖片
+      <input type="file" id="file" accept="image/*" hidden>
+    </div>
+    <div class="warn">
+      ⚠️ 截圖 OCR 用瀏覽器內建辨識，中文人名常出錯，不保證正確。
+      更可靠的做法：在 Mac 上用<b>原況文字（Live Text）</b>直接在截圖選取人名複製，再貼到上面框裡。
+    </div>
+    <div id="ocrStatus" class="hint" style="margin-top:8px;"></div>
+  </div>
+
+  <!-- Step 3: 計算 -->
+  <div class="card">
+    <h2><span class="step">3</span> 計算機會</h2>
+    <div class="row">
+      <button class="btn-primary" onclick="calc()">計算</button>
+      <span class="hint" id="calcHint" style="margin:0;"></span>
+    </div>
+    <div id="tableBox"></div>
+  </div>
+
+  <!-- Step 4: 抽獎 -->
+  <div class="card">
+    <h2><span class="step">4</span> 抽獎</h2>
+    <div class="row">
+      <label class="opt">每期抽 <input type="number" id="winCount" value="3" min="1"> 位</label>
+      <label class="opt"><input type="checkbox" id="onceOnly"> 同一人最多中一次</label>
+      <label class="opt"><input type="checkbox" id="soundOn" checked> 緊張音效</label>
+      <button class="btn-accent" onclick="draw()">開始抽獎</button>
+    </div>
+    <p class="hint" style="margin:10px 0 0;">規則：中一次扣一張籤，籤沒用完的人可以再中。勾「同一人最多中一次」＝中過就移除他全部的籤。</p>
+
+    <p class="hint" style="font-weight:600;color:var(--ink);margin:16px 0 6px;">獎項（共 3 個，揭曉順序：三獎 → 二獎 → 大獎）</p>
+    <div class="prize-grid">
+      <label class="prize-row"><span class="prize-tag">三獎（每次填）</span>
+        <input type="text" id="prize3" placeholder="這次的三獎，例如：飲料一杯"></label>
+      <label class="prize-row"><span class="prize-tag">二獎</span>
+        <input type="text" id="prize2" value="訂單金額最低單品，店長買單"></label>
+      <label class="prize-row"><span class="prize-tag">大獎</span>
+        <input type="text" id="prize1" value="訂單金額最高單品，店長買單"></label>
+    </div>
+
+    <div class="winner-box">
+      <div class="winner-name" id="rolling">—</div>
+      <div class="winner-list" id="winners"></div>
+    </div>
+    <div class="row" id="recordRow" style="display:none;">
+      <button class="btn-ghost" onclick="clearRecord()">清空中獎紀錄（開新一期）</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="drawOverlay">
+  <canvas id="confetti"></canvas>
+  <div class="overlay-inner">
+    <div class="ov-label" id="ovLabel">抽獎中…</div>
+    <div class="ov-name" id="ovName">—</div>
+    <div class="ov-winners" id="ovWinners"></div>
+    <button class="ov-close" id="ovClose" onclick="closeOverlay()" style="display:none;">關閉</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+let computed = []; // [{name, amount, buyChances, commented, total}]
+
+// 解析訂單：每行抓最後一個數字當金額，其餘當名字
+function parseOrders(text) {
+  const out = [];
+  text.split(/\r?\n/).forEach(line => {
+    const raw = line.trim();
+    if (!raw) return;
+    // 找出所有數字（含千分位逗號），取最大的當金額
+    const nums = raw.match(/[\d,]+(?:\.\d+)?/g);
+    if (!nums) return;
+    const amount = Math.max(...nums.map(n => parseFloat(n.replace(/,/g, '')) || 0));
+    // 名字 = 去掉金額相關字元後的文字
+    let name = raw
+      .replace(/[\d,]+(?:\.\d+)?/g, ' ')
+      .replace(/[\$＄元¥,，\-－—–:：、\t]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!name) name = '(未命名)';
+    if (amount > 0) out.push({ name, amount });
+  });
+  return out;
+}
+
+function parseNames(text) {
+  return text
+    .split(/[\n,，、;；]+/)
+    .map(s => s.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
+function calc() {
+  const per = Math.max(1, parseFloat(document.getElementById('per').value) || 2000);
+  const mergeOrders = document.getElementById('mergeOrders').checked;
+  let orders = parseOrders(document.getElementById('orders').value);
+  const commentNames = parseNames(document.getElementById('comments').value);
+  const commentSet = new Set(commentNames);
+
+  // 合併同名訂單
+  const map = new Map();
+  orders.forEach(o => {
+    const key = mergeOrders ? o.name : o.name + ' ' + Math.random();
+    if (map.has(key)) map.get(key).amount += o.amount;
+    else map.set(key, { name: o.name, amount: o.amount });
+  });
+
+  // 也把「只留言沒下單」的人加進來
+  commentNames.forEach(n => {
+    if (![...map.values()].some(v => v.name === n)) {
+      map.set('comment ' + n, { name: n, amount: 0 });
+    }
+  });
+
+  computed = [...map.values()].map(v => {
+    const buyChances = Math.floor(v.amount / per);
+    const commented = commentSet.has(v.name);
+    const total = buyChances + (commented ? 1 : 0);
+    return { ...v, buyChances, commented, total };
+  }).filter(r => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  renderTable();
+}
+
+function renderTable() {
+  const box = document.getElementById('tableBox');
+  if (!computed.length) {
+    box.innerHTML = '<p class="muted-empty">沒有可參加抽獎的人。請確認訂單金額有沒有滿一次門檻。</p>';
+    document.getElementById('calcHint').textContent = '';
+    return;
+  }
+  const totalPeople = computed.length;
+  const totalChances = computed.reduce((s, r) => s + r.total, 0);
+  let html = `<div class="summary">
+    <div>參加人數<b>${totalPeople}</b></div>
+    <div>總機會數<b>${totalChances}</b></div>
+  </div>`;
+  html += '<table><thead><tr><th>名字</th><th class="num">金額</th><th class="num">購買機會</th><th class="num">留言</th><th class="num">總機會</th></tr></thead><tbody>';
+  computed.forEach(r => {
+    html += `<tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td class="num">${r.amount ? r.amount.toLocaleString() : '—'}</td>
+      <td class="num">${r.buyChances}</td>
+      <td class="num">${r.commented ? '<span class="tag-c">+1</span>' : '—'}</td>
+      <td class="num"><span class="pill">${r.total}</span></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+  document.getElementById('calcHint').textContent = `共 ${totalPeople} 人、${totalChances} 次機會`;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+// 加權抽獎（扣籤制：中一次扣一張，籤沒用完可再中）
+let roundNo = 0;
+function draw() {
+  if (!computed.length) { calc(); }
+  if (!computed.length) { alert('還沒有可抽獎的名單，請先在上面貼資料並計算。'); return; }
+
+  const count = Math.max(1, parseInt(document.getElementById('winCount').value) || 1);
+  const onceOnly = document.getElementById('onceOnly').checked;
+  const soundOn = document.getElementById('soundOn').checked;
+  // 獎項：揭曉順序由小到大（三獎先、大獎最後揭曉）
+  const prizeList = [
+    document.getElementById('prize3').value.trim() || '三獎',
+    document.getElementById('prize2').value.trim() || '二獎',
+    document.getElementById('prize1').value.trim() || '大獎'
+  ];
+
+  // 每個人目前剩餘籤數（會被中獎消耗）
+  const tickets = {};
+  computed.forEach(r => { tickets[r.name] = r.total; });
+
+  const picked = []; // { name, before, after, prize }
+  for (let s = 0; s < count; s++) {
+    // 依剩餘籤數組加權池
+    const pool = [];
+    for (const n in tickets) { for (let i = 0; i < tickets[n]; i++) pool.push(n); }
+    if (!pool.length) break; // 籤抽完了，提早結束
+
+    const name = pool[Math.floor(Math.random() * pool.length)];
+    const before = tickets[name];
+    tickets[name] = onceOnly ? 0 : before - 1; // 中過移除全部 / 扣一張
+    picked.push({ name, before, after: tickets[name], prize: prizeList[s] || '' });
+  }
+
+  if (!picked.length) { alert('目前沒有任何籤可抽，請確認名單。'); return; }
+  openOverlay(picked, soundOn);
+}
+
+// ===== 全螢幕抽獎動畫 =====
+function openOverlay(picked, soundOn) {
+  const ov = document.getElementById('drawOverlay');
+  const ovName = document.getElementById('ovName');
+  const ovLabel = document.getElementById('ovLabel');
+  const ovWinners = document.getElementById('ovWinners');
+  ovWinners.innerHTML = '';
+  ovName.style.display = 'block';
+  ovLabel.textContent = '抽獎中…';
+  document.getElementById('ovClose').style.display = 'none';
+  ov.classList.add('show');
+
+  const allNames = computed.map(r => r.name);
+  let delay = 38;
+  function tick() {
+    ovName.textContent = allNames[Math.floor(Math.random() * allNames.length)] || '—';
+    if (soundOn) snareHit(Math.min(0.24, 0.08 + delay / 1800)); // 鼓點，越接近結尾越強
+    delay *= 1.13; // 逐漸變慢
+    if (delay < 420) setTimeout(tick, delay);
+    else reveal(picked, soundOn);
+  }
+  tick();
+}
+
+function reveal(picked, soundOn) {
+  document.getElementById('ovName').style.display = 'none';
+  document.getElementById('ovLabel').textContent = '🎉 恭喜中獎';
+  if (soundOn) crash(0.18);
+  startConfetti();
+
+  const ovWinners = document.getElementById('ovWinners');
+  picked.forEach((p, i) => {
+    setTimeout(() => {
+      const removed = p.before - p.after;
+      const isGrand = (i === picked.length - 1); // 最後揭曉＝最大獎
+      const el = document.createElement('div');
+      el.className = 'ov-win' + (isGrand ? ' grand' : '');
+      const prize = p.prize ? `<div class="ov-prize">${escapeHtml(p.prize)}</div>` : '';
+      el.innerHTML = `${prize}<b>${escapeHtml(p.name)}</b><span>${p.before} 次機會 −${removed}（剩 ${p.after}）</span>`;
+      ovWinners.appendChild(el);
+      if (soundOn) { if (isGrand) winChime(); else bell(1318, 0.3, 0.14); }
+    }, i * 720);
+  });
+
+  // 累積到下方中獎紀錄（名字保留，不洗掉舊的）
+  roundNo++;
+  const block = document.createElement('div');
+  block.className = 'round';
+  let html = `<div class="round-h">第 ${roundNo} 期　${picked.length} 位中獎</div>`;
+  picked.forEach(p => {
+    const removed = p.before - p.after;
+    const prize = p.prize ? `【${escapeHtml(p.prize)}】 ` : '';
+    html += `<div class="w">${prize}${escapeHtml(p.name)} <span>${p.before} 次 −${removed}，剩 ${p.after}</span></div>`;
+  });
+  block.innerHTML = html;
+  document.getElementById('winners').appendChild(block);
+  document.getElementById('rolling').textContent = '🎉 中獎紀錄';
+  document.getElementById('recordRow').style.display = 'flex';
+
+  setTimeout(() => { document.getElementById('ovClose').style.display = 'inline-block'; }, picked.length * 720 + 500);
+}
+
+function clearRecord() {
+  document.getElementById('winners').innerHTML = '';
+  document.getElementById('rolling').textContent = '—';
+  document.getElementById('recordRow').style.display = 'none';
+  roundNo = 0;
+}
+
+function closeOverlay() {
+  document.getElementById('drawOverlay').classList.remove('show');
+  stopConfetti();
+}
+
+// ===== 彩帶 =====
+let confettiRAF = null;
+function startConfetti() {
+  const canvas = document.getElementById('confetti');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const colors = ['#c89a5b', '#9CA89E', '#B09C95', '#f3e9d8', '#e8c98a'];
+  const parts = Array.from({ length: 170 }, () => ({
+    x: Math.random() * canvas.width,
+    y: -20 - Math.random() * canvas.height,
+    r: 4 + Math.random() * 7,
+    c: colors[Math.floor(Math.random() * colors.length)],
+    vy: 2 + Math.random() * 3.5,
+    vx: -1.2 + Math.random() * 2.4,
+    rot: Math.random() * Math.PI,
+    vr: -0.12 + Math.random() * 0.24
+  }));
+  function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    parts.forEach(p => {
+      p.y += p.vy; p.x += p.vx; p.rot += p.vr;
+      if (p.y > canvas.height + 20) { p.y = -20; p.x = Math.random() * canvas.width; }
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); ctx.restore();
+    });
+    confettiRAF = requestAnimationFrame(frame);
+  }
+  frame();
+}
+function stopConfetti() {
+  if (confettiRAF) cancelAnimationFrame(confettiRAF);
+  confettiRAF = null;
+  const c = document.getElementById('confetti');
+  if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
+}
+
+// ===== 音效（Web Audio 即時合成，不需外部檔案）=====
+// 風格：鼓點滾奏（隨抽獎變慢）→ 中獎時鈸聲 + 上行鈴聲和弦
+let actx = null;
+function audio() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+// 用白噪音 + 帶通濾波合成打擊樂（鼓點 / 鈸）
+function noiseBurst(dur, vol, freq, q) {
+  try {
+    const a = audio();
+    const n = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, n, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = a.createBufferSource(); src.buffer = buf;
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q || 0.8;
+    const g = a.createGain();
+    src.connect(f); f.connect(g); g.connect(a.destination);
+    const t = a.currentTime;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    src.start(t); src.stop(t + dur);
+  } catch (e) {}
+}
+function snareHit(vol) { noiseBurst(0.05, vol, 1900, 0.7); }  // 鼓點
+function crash(vol) { noiseBurst(0.8, vol, 5500, 0.4); }      // 鈸
+function bell(freq, dur, vol) {                                // 清脆鈴聲
+  try {
+    const a = audio(), o = a.createOscillator(), g = a.createGain();
+    o.type = 'triangle'; o.frequency.value = freq; o.connect(g); g.connect(a.destination);
+    const t = a.currentTime;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+function winChime() {                                          // 中獎：鈸 + 上行 C 大三和弦
+  crash(0.22);
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => bell(f, 0.7, 0.18), i * 110));
+}
+
+// ===== 從原始留言清出人名（依 FB/IG 留言排版規律推斷）=====
+function extractFbNames(raw) {
+  const noiseExact = new Set(['回覆', '作者', 'Facebook', 'Instagram', '讚', '分享', '留言',
+    'Like', 'Reply', 'Share', 'Comment', '已編輯', 'Edited', '追蹤', 'Follow', '最相關', '小編']);
+  const isTime = s => /^\d+\s*(秒|分鐘|小時|天|週|個月|年)/.test(s) ||
+    /(分鐘|小時|天|週)前/.test(s) || /\bago\b/i.test(s) || /^\d{1,2}[\/\-月]\d{1,2}/.test(s);
+  const lines = raw.split(/\r?\n/).map(s => s.trim());
+  const names = [];
+  const authors = new Set();
+  let block = [], blockHasAuthor = false;
+  const flush = () => {
+    const cleaned = block.filter(l => l && !noiseExact.has(l) && !isTime(l));
+    if (cleaned.length) {
+      const name = cleaned[0]; // 每則留言區塊的第一行通常是名字
+      if (blockHasAuthor) authors.add(name);
+      names.push(name);
+    }
+    block = []; blockHasAuthor = false;
+  };
+  lines.forEach(l => {
+    if (l === '作者') { blockHasAuthor = true; return; }
+    if (l === '回覆' || l === 'Reply') { flush(); return; }
+    block.push(l);
+  });
+  flush();
+  const seen = new Set(), uniq = [];
+  names.forEach(n => { if (!seen.has(n)) { seen.add(n); uniq.push(n); } });
+  return { names: uniq, authors: [...authors] };
+}
+
+function cleanRaw() {
+  const raw = document.getElementById('rawComments').value;
+  const status = document.getElementById('cleanStatus');
+  if (!raw.trim()) { status.textContent = '先把留言原文貼到上面框裡再按。'; return; }
+  const { names, authors } = extractFbNames(raw);
+  const excludeAuthor = document.getElementById('excludeAuthor').checked;
+  const authorSet = new Set(authors);
+  const finalNames = excludeAuthor ? names.filter(n => !authorSet.has(n)) : names;
+
+  // 合併到既有的留言名單（去重）
+  const existing = parseNames(document.getElementById('comments').value);
+  const merged = [...new Set([...existing, ...finalNames])];
+  document.getElementById('comments').value = merged.join('\n');
+
+  let msg = `清出 ${finalNames.length} 個人名`;
+  if (excludeAuthor && authors.length) msg += `（已排除作者：${authors.join('、')}）`;
+  msg += '，已放進下方名單，請務必核對。';
+  status.innerHTML = `<span style="color:var(--good)">${msg}</span>`;
+}
+
+// ===== Excel / CSV 訂單匯入 =====
+let xlsxRows = null;
+function xstatus(msg, ok) {
+  const el = document.getElementById('xlsxStatus');
+  el.innerHTML = ok ? `<span style="color:var(--good)">${msg}</span>` : msg;
+}
+function handleXlsx(file) {
+  if (!file) return;
+  const fname = file.name.toLowerCase();
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      let rows;
+      if (typeof XLSX !== 'undefined') {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      } else if (fname.endsWith('.csv')) {
+        rows = parseCSV(new TextDecoder('utf-8').decode(e.target.result));
+      } else {
+        xstatus('Excel 解析元件沒載到（可能沒網路）。請把檔另存成 CSV 再匯入，或連網後重整頁面。');
+        return;
+      }
+      xlsxRows = rows.filter(r => r.some(c => String(c).trim() !== ''));
+      if (!xlsxRows.length) { xstatus('檔案裡沒有資料。'); return; }
+      setupColumnPickers();
+      xstatus(`讀到 ${xlsxRows.length} 列。請確認下面的「姓名欄 / 金額欄」選對了，再按「帶入訂單」。`, true);
+    } catch (err) {
+      xstatus('讀檔失敗：' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function parseCSV(text) {
+  return text.split(/\r?\n/).filter(l => l !== '').map(line => {
+    const out = []; let cur = '', q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (ch === ',' && !q) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur); return out;
+  });
+}
+function setupColumnPickers() {
+  const header = xlsxRows[0].map((c, i) => String(c).trim() || `第 ${i + 1} 欄`);
+  const nameSel = document.getElementById('colName');
+  const amtSel = document.getElementById('colAmount');
+  const opts = header.map((h, i) => `<option value="${i}">${escapeHtml(h)}</option>`).join('');
+  nameSel.innerHTML = opts; amtSel.innerHTML = opts;
+  const guess = re => header.findIndex(h => re.test(h));
+  const ng = guess(/名|姓|name|暱稱|帳號|買家|顧客|客戶|留言者/i);
+  const ag = guess(/金額|金额|總計|合計|小計|實付|應付|總價|amount|total|price/i);
+  nameSel.value = ng >= 0 ? ng : 0;
+  amtSel.value = ag >= 0 ? ag : Math.max(0, header.length - 1);
+  document.getElementById('xlsxMap').style.display = 'block';
+  nameSel.onchange = renderXlsxPreview;
+  amtSel.onchange = renderXlsxPreview;
+  document.getElementById('hasHeader').onchange = renderXlsxPreview;
+  renderXlsxPreview();
+}
+function renderXlsxPreview() {
+  const hasHeader = document.getElementById('hasHeader').checked;
+  const ni = +document.getElementById('colName').value;
+  const ai = +document.getElementById('colAmount').value;
+  const dataRows = hasHeader ? xlsxRows.slice(1) : xlsxRows;
+  const sample = dataRows.slice(0, 4).map(r => {
+    const nm = String(r[ni] ?? '').trim();
+    const amt = String(r[ai] ?? '').replace(/[^\d.]/g, '');
+    return `${nm || '(空)'} → ${amt || '0'} 元`;
+  });
+  document.getElementById('xlsxPreview').textContent = '預覽前幾筆：\n' + sample.join('\n');
+}
+function applyXlsx() {
+  if (!xlsxRows) return;
+  const hasHeader = document.getElementById('hasHeader').checked;
+  const ni = +document.getElementById('colName').value;
+  const ai = +document.getElementById('colAmount').value;
+  const dataRows = hasHeader ? xlsxRows.slice(1) : xlsxRows;
+  const lines = [];
+  let skipped = 0;
+  dataRows.forEach(r => {
+    const nm = String(r[ni] ?? '').trim();
+    const amt = parseFloat(String(r[ai] ?? '').replace(/[^\d.]/g, '')) || 0;
+    if (nm && amt > 0) lines.push(nm + '\t' + amt);
+    else skipped++;
+  });
+  document.getElementById('orders').value = lines.join('\n');
+  calc();
+  let msg = `帶入 ${lines.length} 筆訂單，已自動計算。`;
+  if (skipped) msg += `（略過 ${skipped} 筆沒名字或金額為 0 的列）`;
+  xstatus(msg, true);
+}
+(function bindXlsx() {
+  const xDrop = document.getElementById('xlsxDrop');
+  const xFile = document.getElementById('xlsxFile');
+  xDrop.addEventListener('click', () => xFile.click());
+  xFile.addEventListener('change', e => { if (e.target.files[0]) handleXlsx(e.target.files[0]); });
+  ['dragover', 'dragenter'].forEach(ev => xDrop.addEventListener(ev, e => { e.preventDefault(); xDrop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => xDrop.addEventListener(ev, e => { e.preventDefault(); xDrop.classList.remove('over'); }));
+  xDrop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) handleXlsx(f); });
+})();
+
+// ===== 截圖 OCR（輔助）=====
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const ocrStatus = document.getElementById('ocrStatus');
+
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => { if (e.target.files[0]) runOCR(e.target.files[0]); });
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) runOCR(f);
+});
+
+async function runOCR(file) {
+  ocrStatus.textContent = '辨識中…（第一次要下載中文模型，請稍候）';
+  try {
+    const { data } = await Tesseract.recognize(file, 'chi_tra+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          ocrStatus.textContent = `辨識中… ${Math.round(m.progress * 100)}%`;
+        }
+      }
+    });
+    const lines = data.text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const ta = document.getElementById('comments');
+    ta.value = (ta.value ? ta.value + '\n' : '') + lines.join('\n');
+    ocrStatus.innerHTML = `<span style="color:var(--good)">已加入 ${lines.length} 行。請務必人工核對、刪掉雜訊。</span>`;
+  } catch (err) {
+    ocrStatus.innerHTML = '<span style="color:var(--bad)">辨識失敗，建議改用 Mac 原況文字複製貼上。</span>';
+  }
+}
+</script>
+</body>
+</html>
