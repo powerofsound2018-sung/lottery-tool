@@ -88,8 +88,16 @@
     background: #fff; color: var(--accent); font-size: 13px; display: flex; align-items: center;
     justify-content: center; padding: 0; }
   .voice-play-btn:disabled { opacity: .5; cursor: wait; }
+  .voice-fav-btn { flex-shrink: 0; width: 26px; height: 26px; border: none; background: transparent;
+    color: var(--muted); font-size: 16px; display: flex; align-items: center; justify-content: center;
+    padding: 0; line-height: 1; }
+  .voice-fav-btn.active { color: #d1a23a; }
   .voice-name { font-weight: 700; font-size: 14px; min-width: 110px; }
   .voice-style { font-size: 12px; color: var(--muted); flex: 1; }
+  .voice-section-title { font-size: 12px; font-weight: 700; color: var(--muted); margin: 12px 4px 4px;
+    letter-spacing: .04em; }
+  .voice-section-title:first-child { margin-top: 2px; }
+  .charcount { font-size: 12px; color: var(--muted); text-align: right; margin-top: 4px; }
   .charcount { font-size: 12px; color: var(--muted); text-align: right; margin-top: 4px; }
 </style>
 </head>
@@ -133,8 +141,8 @@
     <p class="voice-hint" style="margin-top:4px;">3.8 版支援額外指定語氣風格，留空就用預設自然語氣。</p>
 
     <label class="field">音色</label>
-    <p class="voice-hint" style="margin:0 0 6px;">點每個音色左邊的 ▶ 可以聽一句示範，會用目前選的模型即時生成（會消耗一點 API 額度）。點了之後那個音色就會被選取，用來做上面第 3 步的生成。</p>
-    <div class="voice-list" id="voiceList"></div>
+    <p class="voice-hint" style="margin:0 0 6px;">點 ▶ 可以聽一句示範（會用目前選的模型即時生成，消耗一點 API 額度），點了之後那個音色就會被選取，用來做上面第 3 步的生成。點 ☆ 可以收藏成最愛，之後就不用每次重新找。</p>
+    <div class="voice-list" id="voiceListContainer"></div>
     <audio id="previewPlayer" style="display:none;"></audio>
   </div>
 
@@ -169,23 +177,35 @@
 </div>
 
 <script>
+// [名稱, 風格, 性別]，性別依 Google 官方文件分類
 const VOICES = [
-  ['Zephyr','明亮'], ['Puck','歡快'], ['Charon','知性'], ['Kore','堅定'],
-  ['Fenrir','易激動'], ['Leda','年輕'], ['Orus','堅定'], ['Aoede','輕快'],
-  ['Callirrhoe','隨和'], ['Autonoe','明亮'], ['Enceladus','氣音'], ['Iapetus','清晰'],
-  ['Umbriel','隨和'], ['Algieba','流暢'], ['Despina','流暢'], ['Erinome','清晰'],
-  ['Algenib','沙啞'], ['Rasalgethi','知性'], ['Laomedeia','歡快'], ['Achernar','柔和'],
-  ['Alnilam','堅定'], ['Schedar','平穩'], ['Gacrux','成熟'], ['Pulcherrima','直接'],
-  ['Achird','友善'], ['Zubenelgenubi','隨性'], ['Vindemiatrix','溫柔'], ['Sadachbia','活潑'],
-  ['Sadaltager','博學'], ['Sulafat','溫暖']
+  ['Zephyr','明亮','F'], ['Puck','歡快','M'], ['Charon','知性','M'], ['Kore','堅定','F'],
+  ['Fenrir','易激動','M'], ['Leda','年輕','F'], ['Orus','堅定','M'], ['Aoede','輕快','F'],
+  ['Callirrhoe','隨和','F'], ['Autonoe','明亮','F'], ['Enceladus','氣音','M'], ['Iapetus','清晰','M'],
+  ['Umbriel','隨和','M'], ['Algieba','流暢','M'], ['Despina','流暢','F'], ['Erinome','清晰','F'],
+  ['Algenib','沙啞','M'], ['Rasalgethi','知性','M'], ['Laomedeia','歡快','F'], ['Achernar','柔和','F'],
+  ['Alnilam','堅定','M'], ['Schedar','平穩','M'], ['Gacrux','成熟','F'], ['Pulcherrima','直接','F'],
+  ['Achird','友善','M'], ['Zubenelgenubi','隨性','M'], ['Vindemiatrix','溫柔','F'], ['Sadachbia','活潑','M'],
+  ['Sadaltager','博學','M'], ['Sulafat','溫暖','F']
 ];
 
 const SAMPLE_TEXT = '哈囉，很高興認識你，這是這個聲音的示範。';
 let currentVoice = 'Kore';
 const voicePreviewCache = {};
 
+let favoriteVoices = new Set();
+try { favoriteVoices = new Set(JSON.parse(localStorage.getItem('gemini_tts_favorite_voices') || '[]')); } catch (e) {}
+
 function init() {
   renderVoiceList();
+  document.getElementById('voiceListContainer').addEventListener('click', e => {
+    const favBtn = e.target.closest('.voice-fav-btn');
+    if (favBtn) { toggleFavoriteVoice(favBtn.dataset.voice); return; }
+    const playBtn = e.target.closest('.voice-play-btn');
+    if (playBtn) { previewVoice(playBtn.dataset.voice, playBtn); return; }
+    const row = e.target.closest('.voice-row');
+    if (row) { selectVoice(row.dataset.voice); }
+  });
 
   const modelSel = document.getElementById('model');
   const modelCustom = document.getElementById('modelCustom');
@@ -204,28 +224,41 @@ function init() {
   ta.addEventListener('input', () => { cc.textContent = ta.value.length + ' 字'; });
 }
 
-function renderVoiceList() {
-  const box = document.getElementById('voiceList');
-  box.innerHTML = VOICES.map(([name, style]) => `
+function voiceRowHtml(name, style) {
+  const isFav = favoriteVoices.has(name);
+  return `
     <div class="voice-row${name === currentVoice ? ' selected' : ''}" data-voice="${name}">
+      <button type="button" class="voice-fav-btn${isFav ? ' active' : ''}" data-voice="${name}" title="加入最愛">${isFav ? '★' : '☆'}</button>
       <button type="button" class="voice-play-btn" data-voice="${name}" title="試聽">▶</button>
       <span class="voice-name">${name}</span>
       <span class="voice-style">${style}</span>
-    </div>
-  `).join('');
+    </div>`;
+}
 
-  box.querySelectorAll('.voice-row').forEach(row => {
-    row.addEventListener('click', e => {
-      if (e.target.closest('.voice-play-btn')) return;
-      selectVoice(row.dataset.voice);
-    });
-  });
-  box.querySelectorAll('.voice-play-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      previewVoice(btn.dataset.voice, btn);
-    });
-  });
+function renderVoiceList() {
+  const box = document.getElementById('voiceListContainer');
+  const favList = VOICES.filter(([name]) => favoriteVoices.has(name));
+  const femaleList = VOICES.filter(([, , gender]) => gender === 'F');
+  const maleList = VOICES.filter(([, , gender]) => gender === 'M');
+
+  let html = '';
+  if (favList.length) {
+    html += `<div class="voice-section-title">⭐ 我的最愛</div>`;
+    html += favList.map(([name, style]) => voiceRowHtml(name, style)).join('');
+  }
+  html += `<div class="voice-section-title">👩 女聲</div>`;
+  html += femaleList.map(([name, style]) => voiceRowHtml(name, style)).join('');
+  html += `<div class="voice-section-title">👨 男聲</div>`;
+  html += maleList.map(([name, style]) => voiceRowHtml(name, style)).join('');
+
+  box.innerHTML = html;
+}
+
+function toggleFavoriteVoice(name) {
+  if (favoriteVoices.has(name)) favoriteVoices.delete(name);
+  else favoriteVoices.add(name);
+  localStorage.setItem('gemini_tts_favorite_voices', JSON.stringify([...favoriteVoices]));
+  renderVoiceList();
 }
 
 function selectVoice(name) {
