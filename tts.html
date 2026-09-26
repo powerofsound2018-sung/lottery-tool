@@ -119,13 +119,18 @@
     <label class="field">模型</label>
     <div class="row" style="margin-top:0;">
       <select id="model">
-        <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS（快、便宜，推薦）</option>
-        <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro TTS（品質較高、較慢）</option>
+        <option value="gemini-3.8-flash-tts">Gemini 3.8 Flash TTS（最新，表現力最好，推薦）</option>
+        <option value="gemini-3.8-flash-lite-tts">Gemini 3.8 Flash-Lite TTS（更快更便宜，適合大量生成）</option>
+        <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS（舊版，只有先前用過的帳號能用）</option>
         <option value="__custom__">自訂模型代號…</option>
       </select>
     </div>
-    <input type="text" id="modelCustom" placeholder="例如 gemini-3-flash-preview-tts（若 Google 有更新模型，直接填代號即可）" style="display:none; margin-top:8px;">
-    <p class="voice-hint">如果 Google 之後推出更新版本（例如你說的 3.8 / 3 系列），選「自訂模型代號」貼上 AI Studio 顯示的正確模型 ID 就能用，不用等這個工具更新。</p>
+    <input type="text" id="modelCustom" placeholder="貼上 AI Studio / 官方文件上顯示的正確模型 ID" style="display:none; margin-top:8px;">
+    <p class="voice-hint">如果之後 Google 又推出更新版本，選「自訂模型代號」貼上正確 ID 就能用，不用等這個工具更新。（舊的 gemini-2.5 preview 模型現在限制只給先前用過的帳號使用，新帳號用會靜默失敗，建議直接用預設的 3.8 版。）</p>
+
+    <label class="field">語氣風格（選填）</label>
+    <input type="text" id="style" placeholder="例如：開心又興奮、輕聲細語、生氣、新聞主播的語氣">
+    <p class="voice-hint" style="margin-top:4px;">3.8 版支援額外指定語氣風格，留空就用預設自然語氣。</p>
 
     <label class="field">音色</label>
     <p class="voice-hint" style="margin:0 0 6px;">點每個音色左邊的 ▶ 可以聽一句示範，會用目前選的模型即時生成（會消耗一點 API 額度）。點了之後那個音色就會被選取，用來做上面第 3 步的生成。</p>
@@ -155,6 +160,8 @@
     <div class="hint" style="margin-top:8px;">
       <b>生成失敗、跳 CORS 或網路錯誤？</b><br>
       Google 的 Generative Language API 目前主要設計給伺服器端呼叫，少數瀏覽器/網路環境可能會擋掉直接從網頁發出的請求。如果一直失敗，把錯誤訊息貼給我，或改用有後端的環境呼叫同一支 API。<br><br>
+      <b>生成失敗，錯誤裡有 finishReason: OTHER，但沒有更明確的原因？</b><br>
+      這通常代表模型有收到請求也扣了 token，但拒絕產生內容。常見原因是這組 API Key 的帳號／專案還沒有權限使用這個模型（例如舊版 gemini-2.5 preview 模型現在只開放給先前用過的帳號），或還沒開通計費。建議先改用預設的 <code>gemini-3.8-flash-tts</code>；如果還是失敗，去 <a href="https://aistudio.google.com" target="_blank" rel="noopener">Google AI Studio</a> 用同一組帳號、同一個模型直接測試，確認是不是帳號本身的權限問題。<br><br>
       <b>API Key 安全嗎？</b><br>
       金鑰只存在你瀏覽器的 localStorage（勾選「記住」時），生成時直接以你的瀏覽器身分呼叫 Google，沒有任何中繼伺服器會看到金鑰。建議在 Google AI Studio 幫這組金鑰設定用量上限。
     </div>
@@ -297,10 +304,12 @@ function pcmBase64ToWavBlob(base64, sampleRate, numChannels, bitsPerSample) {
   return new Blob([header, pcmBytes], { type: 'audio/wav' });
 }
 
-async function synthesizeSpeech(apiKey, model, voice, text) {
+async function synthesizeSpeech(apiKey, model, voice, text, style) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const contentPart = { text };
+  if (style) contentPart.speech_metadata = { style };
   const body = {
-    contents: [{ parts: [{ text }] }],
+    contents: [{ parts: [contentPart] }],
     generationConfig: {
       responseModalities: ['AUDIO'],
       speechConfig: {
@@ -353,6 +362,7 @@ async function generate() {
   const model = getModel();
   const voice = currentVoice;
   const text = document.getElementById('text').value.trim();
+  const style = document.getElementById('style').value.trim();
 
   if (!apiKey) { errorBox.innerHTML = '<div class="err">請先貼上 API Key。</div>'; return; }
   if (!model) { errorBox.innerHTML = '<div class="err">請選擇或填入模型代號。</div>'; return; }
@@ -368,7 +378,7 @@ async function generate() {
   status.textContent = '生成中…';
 
   try {
-    const blob = await synthesizeSpeech(apiKey, model, voice, text);
+    const blob = await synthesizeSpeech(apiKey, model, voice, text, style);
     const blobUrl = URL.createObjectURL(blob);
 
     const player = document.getElementById('player');
