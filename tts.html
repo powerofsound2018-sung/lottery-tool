@@ -78,6 +78,18 @@
   details { margin-top: 12px; }
   summary { cursor: pointer; font-size: 13px; color: var(--accent); }
   .voice-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .voice-list { display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow-y: auto;
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: #fdfcfa; }
+  .voice-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px;
+    cursor: pointer; }
+  .voice-row:hover { background: var(--accent-soft); }
+  .voice-row.selected { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .voice-play-btn { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line);
+    background: #fff; color: var(--accent); font-size: 13px; display: flex; align-items: center;
+    justify-content: center; padding: 0; }
+  .voice-play-btn:disabled { opacity: .5; cursor: wait; }
+  .voice-name { font-weight: 700; font-size: 14px; min-width: 110px; }
+  .voice-style { font-size: 12px; color: var(--muted); flex: 1; }
   .charcount { font-size: 12px; color: var(--muted); text-align: right; margin-top: 4px; }
 </style>
 </head>
@@ -116,10 +128,9 @@
     <p class="voice-hint">如果 Google 之後推出更新版本（例如你說的 3.8 / 3 系列），選「自訂模型代號」貼上 AI Studio 顯示的正確模型 ID 就能用，不用等這個工具更新。</p>
 
     <label class="field">音色</label>
-    <div class="row" style="margin-top:0;">
-      <select id="voice"></select>
-    </div>
-    <div class="voice-hint" id="voiceDesc"></div>
+    <p class="voice-hint" style="margin:0 0 6px;">點每個音色左邊的 ▶ 可以聽一句示範，會用目前選的模型即時生成（會消耗一點 API 額度）。點了之後那個音色就會被選取，用來做上面第 3 步的生成。</p>
+    <div class="voice-list" id="voiceList"></div>
+    <audio id="previewPlayer" style="display:none;"></audio>
   </div>
 
   <!-- Step 3: 文字 -->
@@ -162,12 +173,12 @@ const VOICES = [
   ['Sadaltager','博學'], ['Sulafat','溫暖']
 ];
 
+const SAMPLE_TEXT = '哈囉，很高興認識你，這是這個聲音的示範。';
+let currentVoice = 'Kore';
+const voicePreviewCache = {};
+
 function init() {
-  const voiceSel = document.getElementById('voice');
-  voiceSel.innerHTML = VOICES.map(([name]) => `<option value="${name}">${name}</option>`).join('');
-  voiceSel.value = 'Kore';
-  updateVoiceDesc();
-  voiceSel.addEventListener('change', updateVoiceDesc);
+  renderVoiceList();
 
   const modelSel = document.getElementById('model');
   const modelCustom = document.getElementById('modelCustom');
@@ -186,10 +197,67 @@ function init() {
   ta.addEventListener('input', () => { cc.textContent = ta.value.length + ' 字'; });
 }
 
-function updateVoiceDesc() {
-  const v = document.getElementById('voice').value;
-  const found = VOICES.find(([name]) => name === v);
-  document.getElementById('voiceDesc').textContent = found ? `風格參考：${found[1]}` : '';
+function renderVoiceList() {
+  const box = document.getElementById('voiceList');
+  box.innerHTML = VOICES.map(([name, style]) => `
+    <div class="voice-row${name === currentVoice ? ' selected' : ''}" data-voice="${name}">
+      <button type="button" class="voice-play-btn" data-voice="${name}" title="試聽">▶</button>
+      <span class="voice-name">${name}</span>
+      <span class="voice-style">${style}</span>
+    </div>
+  `).join('');
+
+  box.querySelectorAll('.voice-row').forEach(row => {
+    row.addEventListener('click', e => {
+      if (e.target.closest('.voice-play-btn')) return;
+      selectVoice(row.dataset.voice);
+    });
+  });
+  box.querySelectorAll('.voice-play-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      previewVoice(btn.dataset.voice, btn);
+    });
+  });
+}
+
+function selectVoice(name) {
+  currentVoice = name;
+  document.querySelectorAll('.voice-row').forEach(r => {
+    r.classList.toggle('selected', r.dataset.voice === name);
+  });
+}
+
+async function previewVoice(name, btnEl) {
+  selectVoice(name);
+  const errorBox = document.getElementById('errorBox');
+  errorBox.innerHTML = '';
+
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const model = getModel();
+  if (!apiKey) { errorBox.innerHTML = '<div class="err">請先貼上 API Key 才能試聽。</div>'; return; }
+  if (!model) { errorBox.innerHTML = '<div class="err">請先選擇或填入模型代號。</div>'; return; }
+
+  const cacheKey = model + '|' + name;
+  const original = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = '…';
+  try {
+    let blobUrl = voicePreviewCache[cacheKey];
+    if (!blobUrl) {
+      const blob = await synthesizeSpeech(apiKey, model, name, SAMPLE_TEXT);
+      blobUrl = URL.createObjectURL(blob);
+      voicePreviewCache[cacheKey] = blobUrl;
+    }
+    const player = document.getElementById('previewPlayer');
+    player.src = blobUrl;
+    await player.play();
+  } catch (err) {
+    errorBox.innerHTML = `<div class="err">試聽失敗：${escapeHtml(err.message)}</div>`;
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = original;
+  }
 }
 
 function getModel() {
@@ -229,6 +297,51 @@ function pcmBase64ToWavBlob(base64, sampleRate, numChannels, bitsPerSample) {
   return new Blob([header, pcmBytes], { type: 'audio/wav' });
 }
 
+async function synthesizeSpeech(apiKey, model, voice, text) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    contents: [{ parts: [{ text }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } }
+      }
+    }
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    const msg = data && data.error && data.error.message ? data.error.message : `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  const candidate = data?.candidates?.[0];
+  const part = candidate?.content?.parts?.[0];
+  const inline = part?.inlineData;
+  if (!inline || !inline.data) {
+    const reason = candidate?.finishReason;
+    if (reason === 'OTHER' || reason === 'SAFETY' || reason === 'PROHIBITED_CONTENT' || reason === 'BLOCKLIST') {
+      throw new Error(
+        `模型沒有回傳任何音訊（finishReason: ${reason}），通常代表這組 API Key／專案還沒開通付費方案，或這個 preview 模型還沒開放給你的帳號使用。` +
+        `請到 https://aistudio.google.com 用同一個模型、同樣的文字直接測試看看：如果那邊也失敗，去 Google Cloud Console 幫這個專案啟用計費（billing）；如果那邊成功，把它「Get Code」顯示的請求格式回報給我對照。`
+      );
+    }
+    throw new Error('回應裡沒有音訊資料（finishReason: ' + (reason || '未知') + '），回應內容：' + JSON.stringify(data).slice(0, 400));
+  }
+
+  const mimeType = inline.mimeType || 'audio/L16;rate=24000';
+  const rateMatch = mimeType.match(/rate=(\d+)/);
+  const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+  return pcmBase64ToWavBlob(inline.data, sampleRate, 1, 16);
+}
+
 async function generate() {
   const errorBox = document.getElementById('errorBox');
   const status = document.getElementById('status');
@@ -238,7 +351,7 @@ async function generate() {
 
   const apiKey = document.getElementById('apiKey').value.trim();
   const model = getModel();
-  const voice = document.getElementById('voice').value;
+  const voice = currentVoice;
   const text = document.getElementById('text').value.trim();
 
   if (!apiKey) { errorBox.innerHTML = '<div class="err">請先貼上 API Key。</div>'; return; }
@@ -254,41 +367,8 @@ async function generate() {
   genBtn.disabled = true;
   status.textContent = '生成中…';
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const body = {
-    contents: [{ parts: [{ text }] }],
-    generationConfig: {
-      responseModalities: ['AUDIO'],
-      speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } }
-      }
-    }
-  };
-
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      const msg = data && data.error && data.error.message ? data.error.message : `HTTP ${res.status}`;
-      throw new Error(msg);
-    }
-
-    const part = data?.candidates?.[0]?.content?.parts?.[0];
-    const inline = part?.inlineData;
-    if (!inline || !inline.data) {
-      throw new Error('回應裡沒有音訊資料，請確認模型代號是否支援 TTS（回應內容：' + JSON.stringify(data).slice(0, 400) + '）');
-    }
-
-    const mimeType = inline.mimeType || 'audio/L16;rate=24000';
-    const rateMatch = mimeType.match(/rate=(\d+)/);
-    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-
-    const blob = pcmBase64ToWavBlob(inline.data, sampleRate, 1, 16);
+    const blob = await synthesizeSpeech(apiKey, model, voice, text);
     const blobUrl = URL.createObjectURL(blob);
 
     const player = document.getElementById('player');
