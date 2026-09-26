@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemini 語音生成工具</title>
+<style>
+  :root {
+    --bg: #faf8f5;
+    --card: #ffffff;
+    --ink: #4F4842;
+    --muted: #9b938b;
+    --line: #ece7e0;
+    --accent: #c89a5b;
+    --accent-soft: #f3e9d8;
+    --good: #9CA89E;
+    --bad: #B09C95;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+  a.back { color: var(--muted); font-size: 13px; text-decoration: none; }
+  a.back:hover { color: var(--accent); }
+  h1 { font-size: 24px; font-weight: 700; margin: 14px 0 4px; letter-spacing: 0.02em; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
+  .card .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .step { display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft);
+    color: var(--accent); font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  textarea {
+    width: 100%; min-height: 100px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    font-family: inherit; font-size: 14px;
+    color: var(--ink); background: #fdfcfa; line-height: 1.6;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  input[type=text], input[type=password] {
+    width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    font-family: inherit; font-size: 14px; color: var(--ink); background: #fdfcfa;
+  }
+  input[type=text]:focus, input[type=password]:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  label.opt { font-size: 13px; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+  label.field { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  label.field:first-child { margin-top: 0; }
+  select { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px;
+    font-size: 13px; font-family: inherit; background: #fdfcfa; color: var(--ink); flex: 1; min-width: 160px; }
+  button {
+    border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px;
+    font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity .15s;
+  }
+  button:hover { opacity: .88; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-ghost { background: var(--accent-soft); color: var(--accent); }
+  .warn { background: #fbf3ea; border: 1px solid #f0dcc0; color: #8a6d3b;
+    border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-top: 10px; }
+  .err { background: #fbeceb; border: 1px solid #e6bcb8; color: #93433c;
+    border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-top: 10px; white-space: pre-wrap; }
+  .ok { color: var(--good); font-size: 13px; }
+  audio { width: 100%; margin-top: 14px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+  .voice-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .charcount { font-size: 12px; color: var(--muted); text-align: right; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← 回抽獎工具</a>
+  <h1>🔊 Gemini 語音生成工具</h1>
+  <p class="sub">用 Google Gemini 的文字轉語音模型生成音色。API Key 只存在你的瀏覽器，直接呼叫 Google 的伺服器，不會經過任何第三方。</p>
+
+  <!-- Step 1: API Key -->
+  <div class="card">
+    <h2><span class="step">1</span> API Key</h2>
+    <p class="hint">到 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> 免費申請一組金鑰，貼在這裡。</p>
+    <input type="password" id="apiKey" placeholder="貼上你的 Gemini API Key（AIza...）">
+    <div class="row">
+      <label class="opt"><input type="checkbox" id="rememberKey"> 記住這個 API Key（存在這台裝置的瀏覽器裡）</label>
+    </div>
+    <div class="warn">
+      ⚠️ 這是純前端工具，生成時金鑰會直接從你的瀏覽器送到 Google，不會經過我們的伺服器。但因為是「明文放在前端」，別在公用電腦勾選記住，也別把這頁面分享給不信任的人。
+    </div>
+  </div>
+
+  <!-- Step 2: 設定 -->
+  <div class="card">
+    <h2><span class="step">2</span> 選擇模型與音色</h2>
+
+    <label class="field">模型</label>
+    <div class="row" style="margin-top:0;">
+      <select id="model">
+        <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS（快、便宜，推薦）</option>
+        <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro TTS（品質較高、較慢）</option>
+        <option value="__custom__">自訂模型代號…</option>
+      </select>
+    </div>
+    <input type="text" id="modelCustom" placeholder="例如 gemini-3-flash-preview-tts（若 Google 有更新模型，直接填代號即可）" style="display:none; margin-top:8px;">
+    <p class="voice-hint">如果 Google 之後推出更新版本（例如你說的 3.8 / 3 系列），選「自訂模型代號」貼上 AI Studio 顯示的正確模型 ID 就能用，不用等這個工具更新。</p>
+
+    <label class="field">音色</label>
+    <div class="row" style="margin-top:0;">
+      <select id="voice"></select>
+    </div>
+    <div class="voice-hint" id="voiceDesc"></div>
+  </div>
+
+  <!-- Step 3: 文字 -->
+  <div class="card">
+    <h2><span class="step">3</span> 輸入要念的文字</h2>
+    <p class="hint">可以在文字前面加語氣指示，例如「用開心又興奮的語氣說：」，Gemini 會自動判斷語言（支援中文）。</p>
+    <textarea id="text" placeholder="用開心又興奮的語氣說：恭喜中獎！"></textarea>
+    <div class="charcount" id="charcount">0 字</div>
+    <div class="row">
+      <button class="btn-accent" id="genBtn" onclick="generate()">生成語音</button>
+      <span class="ok" id="status"></span>
+    </div>
+    <div id="errorBox"></div>
+    <audio id="player" controls style="display:none;"></audio>
+    <div class="row" id="downloadRow" style="display:none;">
+      <a id="downloadLink" download="gemini-tts.wav"><button class="btn-ghost" type="button">下載 .wav</button></a>
+    </div>
+  </div>
+
+  <details>
+    <summary>常見問題</summary>
+    <div class="hint" style="margin-top:8px;">
+      <b>生成失敗、跳 CORS 或網路錯誤？</b><br>
+      Google 的 Generative Language API 目前主要設計給伺服器端呼叫，少數瀏覽器/網路環境可能會擋掉直接從網頁發出的請求。如果一直失敗，把錯誤訊息貼給我，或改用有後端的環境呼叫同一支 API。<br><br>
+      <b>API Key 安全嗎？</b><br>
+      金鑰只存在你瀏覽器的 localStorage（勾選「記住」時），生成時直接以你的瀏覽器身分呼叫 Google，沒有任何中繼伺服器會看到金鑰。建議在 Google AI Studio 幫這組金鑰設定用量上限。
+    </div>
+  </details>
+</div>
+
+<script>
+const VOICES = [
+  ['Zephyr','明亮'], ['Puck','歡快'], ['Charon','知性'], ['Kore','堅定'],
+  ['Fenrir','易激動'], ['Leda','年輕'], ['Orus','堅定'], ['Aoede','輕快'],
+  ['Callirrhoe','隨和'], ['Autonoe','明亮'], ['Enceladus','氣音'], ['Iapetus','清晰'],
+  ['Umbriel','隨和'], ['Algieba','流暢'], ['Despina','流暢'], ['Erinome','清晰'],
+  ['Algenib','沙啞'], ['Rasalgethi','知性'], ['Laomedeia','歡快'], ['Achernar','柔和'],
+  ['Alnilam','堅定'], ['Schedar','平穩'], ['Gacrux','成熟'], ['Pulcherrima','直接'],
+  ['Achird','友善'], ['Zubenelgenubi','隨性'], ['Vindemiatrix','溫柔'], ['Sadachbia','活潑'],
+  ['Sadaltager','博學'], ['Sulafat','溫暖']
+];
+
+function init() {
+  const voiceSel = document.getElementById('voice');
+  voiceSel.innerHTML = VOICES.map(([name]) => `<option value="${name}">${name}</option>`).join('');
+  voiceSel.value = 'Kore';
+  updateVoiceDesc();
+  voiceSel.addEventListener('change', updateVoiceDesc);
+
+  const modelSel = document.getElementById('model');
+  const modelCustom = document.getElementById('modelCustom');
+  modelSel.addEventListener('change', () => {
+    modelCustom.style.display = modelSel.value === '__custom__' ? 'block' : 'none';
+  });
+
+  const savedKey = localStorage.getItem('gemini_tts_api_key');
+  if (savedKey) {
+    document.getElementById('apiKey').value = savedKey;
+    document.getElementById('rememberKey').checked = true;
+  }
+
+  const ta = document.getElementById('text');
+  const cc = document.getElementById('charcount');
+  ta.addEventListener('input', () => { cc.textContent = ta.value.length + ' 字'; });
+}
+
+function updateVoiceDesc() {
+  const v = document.getElementById('voice').value;
+  const found = VOICES.find(([name]) => name === v);
+  document.getElementById('voiceDesc').textContent = found ? `風格參考：${found[1]}` : '';
+}
+
+function getModel() {
+  const modelSel = document.getElementById('model');
+  if (modelSel.value === '__custom__') {
+    return document.getElementById('modelCustom').value.trim();
+  }
+  return modelSel.value;
+}
+
+function pcmBase64ToWavBlob(base64, sampleRate, numChannels, bitsPerSample) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const pcmBytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) pcmBytes[i] = binary.charCodeAt(i);
+
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const byteRate = sampleRate * blockAlign;
+  const header = new ArrayBuffer(44);
+  const view = new DataView(header);
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + pcmBytes.length, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeStr(36, 'data');
+  view.setUint32(40, pcmBytes.length, true);
+
+  return new Blob([header, pcmBytes], { type: 'audio/wav' });
+}
+
+async function generate() {
+  const errorBox = document.getElementById('errorBox');
+  const status = document.getElementById('status');
+  const genBtn = document.getElementById('genBtn');
+  errorBox.innerHTML = '';
+  status.textContent = '';
+
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const model = getModel();
+  const voice = document.getElementById('voice').value;
+  const text = document.getElementById('text').value.trim();
+
+  if (!apiKey) { errorBox.innerHTML = '<div class="err">請先貼上 API Key。</div>'; return; }
+  if (!model) { errorBox.innerHTML = '<div class="err">請選擇或填入模型代號。</div>'; return; }
+  if (!text) { errorBox.innerHTML = '<div class="err">請輸入要念的文字。</div>'; return; }
+
+  if (document.getElementById('rememberKey').checked) {
+    localStorage.setItem('gemini_tts_api_key', apiKey);
+  } else {
+    localStorage.removeItem('gemini_tts_api_key');
+  }
+
+  genBtn.disabled = true;
+  status.textContent = '生成中…';
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    contents: [{ parts: [{ text }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } }
+      }
+    }
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const msg = data && data.error && data.error.message ? data.error.message : `HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+
+    const part = data?.candidates?.[0]?.content?.parts?.[0];
+    const inline = part?.inlineData;
+    if (!inline || !inline.data) {
+      throw new Error('回應裡沒有音訊資料，請確認模型代號是否支援 TTS（回應內容：' + JSON.stringify(data).slice(0, 400) + '）');
+    }
+
+    const mimeType = inline.mimeType || 'audio/L16;rate=24000';
+    const rateMatch = mimeType.match(/rate=(\d+)/);
+    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+
+    const blob = pcmBase64ToWavBlob(inline.data, sampleRate, 1, 16);
+    const blobUrl = URL.createObjectURL(blob);
+
+    const player = document.getElementById('player');
+    player.src = blobUrl;
+    player.style.display = 'block';
+    player.play().catch(() => {});
+
+    const link = document.getElementById('downloadLink');
+    link.href = blobUrl;
+    document.getElementById('downloadRow').style.display = 'flex';
+
+    status.textContent = '完成！';
+  } catch (err) {
+    errorBox.innerHTML = `<div class="err">生成失敗：${escapeHtml(err.message)}</div>`;
+    status.textContent = '';
+  } finally {
+    genBtn.disabled = false;
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+init();
+</script>
+</body>
+</html>
